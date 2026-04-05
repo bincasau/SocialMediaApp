@@ -10,6 +10,35 @@ from .models import Profile
 def index(request):
     return render(request, 'index.html')
 
+@login_required(login_url='signin')
+def setting(request):
+    user_profile = Profile.objects.get(user=request.user)
+
+    if request.method == 'POST':
+        if request.FILES.get('profileimg') == None:
+            profileimg = user_profile.profileimg
+            location = request.POST['location']
+            bio = request.POST['bio']
+
+            user_profile.profileimg = profileimg
+            user_profile.location = location
+            user_profile.bio = bio
+            user_profile.save()
+
+        if request.FILES.get('profileimg') != None:
+            profileimg = request.FILES.get('profileimg')
+            location = request.POST['location']
+            bio = request.POST['bio']
+
+            user_profile.profileimg = profileimg
+            user_profile.location = location
+            user_profile.bio = bio
+            user_profile.save()
+        
+        return redirect('setting')
+
+    return render(request, 'setting.html', {'user_profile': user_profile})
+
 def signup(request):
     if request.method == 'POST':
 
@@ -28,12 +57,15 @@ def signup(request):
             else:
                 user = User.objects.create_user(username=username, email=email, password=password)
                 user.save()
+
+                user_login = auth.authenticate(username=username, password=password)
+                auth.login(request, user_login)
                 
                 user_model = User.objects.get(username=username)
                 new_profile = Profile.objects.create(user=user_model, id_user=user_model.id)
                 new_profile.save()
 
-                return redirect('signup')
+                return redirect('setting')
         else: 
             messages.info(request, 'Password not matching')
             return redirect('signup')
