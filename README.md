@@ -10,7 +10,7 @@
 
 ---
 
-## ⚙️ Yêu cầu
+## Yêu cầu
 
 * Python >= 3.10
 * pip
@@ -58,17 +58,6 @@ pip install -r requirements.txt
 ---
 
 ## Cấu hình Database
-
-Dự án dùng SQLite sẵn, không cần cài thêm:
-
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-```
 
 ---
 
