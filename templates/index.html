@@ -94,7 +94,7 @@
                                 </form>
 
                                 {% if post.comments_list %}
-                                <div class="comment-list">
+                                <div class="comment-list" data-post-id="{{ post.id }}">
                                     {% for item in post.comments_list|slice:":3" %}
                                     <div class="comment-item">
                                         <strong>@{{ item.username }}</strong>
@@ -106,7 +106,7 @@
                                     {% endif %}
                                 </div>
                                 {% else %}
-                                <div class="muted tiny">No comments yet.</div>
+                                <div class="muted tiny" data-post-id="{{ post.id }}" data-empty-comments>No comments yet.</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -137,7 +137,7 @@
 
                                 <div class="comment-box post-modal__comments">
                                     <h3 class="section-title" id="post-modal-title-{{ post.id }}">Comments</h3>
-                                    <form class="comment-form" action="/comment" method="POST">
+                                    <form class="comment-form" action="/comment" method="POST" data-modal-comment-form>
                                         {% csrf_token %}
                                         <input type="hidden" name="post_id" value="{{ post.id }}">
                                         <input type="hidden" name="next" value="{{ request.path }}">
@@ -145,7 +145,7 @@
                                         <button class="btn secondary" type="submit">Comment</button>
                                     </form>
 
-                                    <div class="comment-list comment-list--scroll">
+                                    <div class="comment-list comment-list--scroll" data-post-id="{{ post.id }}">
                                         {% if post.comments_list %}
                                             {% for item in post.comments_list %}
                                             <div class="comment-item">
@@ -154,7 +154,7 @@
                                             </div>
                                             {% endfor %}
                                         {% else %}
-                                            <div class="muted tiny">No comments yet.</div>
+                                            <div class="muted tiny" data-empty-comments>No comments yet.</div>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -202,6 +202,30 @@
         document.addEventListener('DOMContentLoaded', () => {
             const openButtons = document.querySelectorAll('[data-post-modal-open]');
             const modalSelector = (id) => document.getElementById(id);
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+
+            const buildCommentItem = (username, body) => {
+                const item = document.createElement('div');
+                item.className = 'comment-item';
+                item.innerHTML = '<strong>@' + username + '</strong><span class="muted tiny"></span>';
+                item.querySelector('span').textContent = body;
+                return item;
+            };
+
+            const syncCommentLists = (postId, username, body) => {
+                document.querySelectorAll('.comment-list[data-post-id="' + postId + '"]').forEach((list) => {
+                    const emptyState = list.querySelector('[data-empty-comments]');
+                    if (emptyState) {
+                        emptyState.remove();
+                    }
+
+                    list.prepend(buildCommentItem(username, body));
+                });
+
+                document.querySelectorAll('[data-empty-comments][data-post-id="' + postId + '"]').forEach((emptyState) => {
+                    emptyState.remove();
+                });
+            };
 
             const openModal = (modal) => {
                 if (!modal) {
@@ -234,6 +258,42 @@
             document.querySelectorAll('[data-post-modal-close]').forEach((button) => {
                 button.addEventListener('click', () => {
                     closeModal(button.closest('.post-modal'));
+                });
+            });
+
+            document.querySelectorAll('[data-modal-comment-form]').forEach((form) => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+
+                    const textInput = form.querySelector('input[name="comment"]');
+                    const comment = textInput.value.trim();
+
+                    if (!comment) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            body: new FormData(form),
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': csrfToken,
+                            },
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to submit comment');
+                        }
+
+                        const postId = form.querySelector('input[name="post_id"]').value;
+                        const username = '{{ request.user.username }}';
+                        syncCommentLists(postId, username, comment);
+                        textInput.value = '';
+                        textInput.focus();
+                    } catch (error) {
+                        form.submit();
+                    }
                 });
             });
 
