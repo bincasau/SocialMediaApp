@@ -52,15 +52,113 @@
 
             <section class="card" style="margin-bottom:24px;">
                 <div class="card-body">
-                    <h2 class="section-title">Photo Stream</h2>
-                    <p class="muted tiny">Latest uploads from this profile.</p>
+                    <h2 class="section-title">Posts</h2>
+                    <p class="muted tiny">All posts from this profile.</p>
 
                     {% if user_posts %}
-                    <div class="profile-grid" style="margin-top:12px;">
+                    <div class="stack" style="margin-top:12px;">
                         {% for post in user_posts %}
-                        <a href="{{ post.image.url }}">
-                            <img src="{{ post.image.url }}" alt="post">
-                        </a>
+                        <article class="card" style="box-shadow:none; border-style:dashed;">
+                            <div class="card-body stack">
+                                <div class="post-head">
+                                    <div>
+                                        <strong>@{{ user_object.username }}</strong>
+                                        <div class="muted tiny">{{ post.created_at|date:"d/m/Y H:i" }}</div>
+                                    </div>
+                                    <span class="pill">{{ post.no_of_likes }} like{{ post.no_of_likes|pluralize }}</span>
+                                </div>
+
+                                <button type="button" class="post-image-trigger" data-post-modal-open="post-modal-{{ post.id }}" aria-label="Open post image">
+                                    <img class="post-image" src="{{ post.image.url }}" alt="post image">
+                                </button>
+
+                                {% if post.caption %}
+                                <p style="margin:0;">{{ post.caption }}</p>
+                                {% else %}
+                                <p class="muted tiny" style="margin:0;">No caption.</p>
+                                {% endif %}
+
+                                <div class="comment-box">
+                                    <form class="comment-form" action="/comment" method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="post_id" value="{{ post.id }}">
+                                        <input type="hidden" name="next" value="{{ request.path }}">
+                                        <input class="text-input" type="text" name="comment" placeholder="Write a comment..." required>
+                                        <button class="btn secondary" type="submit">Comment</button>
+                                    </form>
+
+                                    {% if post.comments_list %}
+                                    <div class="comment-list">
+                                        {% for item in post.comments_list|slice:":3" %}
+                                        <div class="comment-item">
+                                            <strong>@{{ item.username }}</strong>
+                                            <span class="muted tiny">{{ item.body }}</span>
+                                        </div>
+                                        {% endfor %}
+                                        {% if post.comments_list|length > 3 %}
+                                        <div class="muted tiny">+{{ post.comments_list|length|add:"-3" }} more comment{{ post.comments_list|length|add:"-3"|pluralize }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    <div class="muted tiny">No comments yet.</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </article>
+
+                        <section class="post-modal" id="post-modal-{{ post.id }}" hidden aria-hidden="true">
+                            <div class="post-modal__backdrop" data-post-modal-close></div>
+                            <div class="post-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="profile-post-modal-title-{{ post.id }}">
+                                <button type="button" class="post-modal__close" data-post-modal-close aria-label="Close viewer">&times;</button>
+
+                                <div class="post-modal__media">
+                                    <img src="{{ post.image.url }}" alt="post image">
+                                </div>
+
+                                <aside class="post-modal__sidebar">
+                                    <div class="post-modal__header">
+                                        <div class="post-user">
+                                            {% if user_profile and user_profile.profileimg %}
+                                            <img src="{{ user_profile.profileimg.url }}" class="avatar" alt="profile">
+                                            {% else %}
+                                            <img src="{% static 'assets/images/avatars/avatar-1.jpg' %}" class="avatar" alt="profile">
+                                            {% endif %}
+                                            <div>
+                                                <a href="/profile/{{ user_object.username }}/"><strong>@{{ user_object.username }}</strong></a>
+                                                <div class="tiny muted">{{ post.created_at|date:"d/m/Y H:i" }}</div>
+                                            </div>
+                                        </div>
+                                        {% if post.caption %}
+                                        <p class="post-modal__caption">{{ post.caption }}</p>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="comment-box post-modal__comments">
+                                        <h3 class="section-title" id="profile-post-modal-title-{{ post.id }}">Comments</h3>
+                                        <form class="comment-form" action="/comment" method="POST">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="post_id" value="{{ post.id }}">
+                                            <input type="hidden" name="next" value="{{ request.path }}">
+                                            <input class="text-input" type="text" name="comment" placeholder="Write a comment..." required>
+                                            <button class="btn secondary" type="submit">Comment</button>
+                                        </form>
+
+                                        <div class="comment-list comment-list--scroll">
+                                            {% if post.comments_list %}
+                                                {% for item in post.comments_list %}
+                                                <div class="comment-item">
+                                                    <strong>@{{ item.username }}</strong>
+                                                    <span class="muted tiny">{{ item.body }}</span>
+                                                </div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="muted tiny">No comments yet.</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </aside>
+                            </div>
+                        </section>
                         {% endfor %}
                     </div>
                     {% else %}
@@ -70,5 +168,52 @@
             </section>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const openButtons = document.querySelectorAll('[data-post-modal-open]');
+            const modalSelector = (id) => document.getElementById(id);
+
+            const openModal = (modal) => {
+                if (!modal) {
+                    return;
+                }
+
+                modal.hidden = false;
+                requestAnimationFrame(() => modal.classList.add('is-open'));
+                document.body.classList.add('modal-open');
+            };
+
+            const closeModal = (modal) => {
+                if (!modal) {
+                    return;
+                }
+
+                modal.classList.remove('is-open');
+                document.body.classList.remove('modal-open');
+                window.setTimeout(() => {
+                    modal.hidden = true;
+                }, 180);
+            };
+
+            openButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    openModal(modalSelector(button.dataset.postModalOpen));
+                });
+            });
+
+            document.querySelectorAll('[data-post-modal-close]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    closeModal(button.closest('.post-modal'));
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    document.querySelectorAll('.post-modal.is-open').forEach((modal) => closeModal(modal));
+                }
+            });
+        });
+    </script>
 </body>
 </html>

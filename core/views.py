@@ -3,10 +3,30 @@ from django.contrib.auth.models import User, auth
 from django.contrib import messages
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from .models import FollowersCount, Post, Profile, LikePost
+from django.utils.http import url_has_allowed_host_and_scheme
+from .models import FollowersCount, Post, Profile, LikePost, Comment
 from itertools import chain
 from django.db.models import Count
 import random
+
+
+def _attach_comments_to_posts(posts):
+    posts = list(posts)
+    post_ids = [post.id for post in posts]
+
+    if not post_ids:
+        return posts
+
+    comments_queryset = Comment.objects.filter(post_id__in=post_ids).order_by('-created_at')
+    comments_by_post = {}
+
+    for item in comments_queryset:
+        comments_by_post.setdefault(item.post_id, []).append(item)
+
+    for post in posts:
+        post.comments_list = comments_by_post.get(post.id, [])
+
+    return posts
 
 # Create your views here.
 @login_required(login_url='signin')
@@ -52,6 +72,8 @@ def index(request):
 
     for profile in suggestions_username_profile_list:
         profile.followers_count = suggestion_followers.get(profile.user.username, 0)
+
+    feed_list = _attach_comments_to_posts(feed_list)
 
     return render(request, 'index.html', {'user_profile': user_profile, 'posts': feed_list, 'suggestions_username_profile_list': suggestions_username_profile_list[:4]})
 
@@ -106,11 +128,35 @@ def like_post(request):
         post.save()
         return redirect('/')
 
+
+@login_required(login_url='signin')
+def comment_post(request):
+    if request.method == 'POST':
+        post_id = request.POST.get('post_id')
+        comment_body = request.POST.get('comment', '').strip()
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or '/'
+
+        if post_id and comment_body:
+            post = Post.objects.filter(id=post_id).first()
+            if post:
+                Comment.objects.create(
+                    post=post,
+                    username=request.user.username,
+                    body=comment_body,
+                )
+
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            next_url = '/'
+
+        return redirect(next_url)
+
+    return redirect('/')
+
 @login_required(login_url='signin')
 def profile(request, username):
     user_object = User.objects.get(username=username)
     user_profile = Profile.objects.filter(user=user_object).first()
-    user_posts = Post.objects.filter(user=username)
+    user_posts = _attach_comments_to_posts(Post.objects.filter(user=username))
     user_post_length = len(user_posts)
 
     follower = request.user.username

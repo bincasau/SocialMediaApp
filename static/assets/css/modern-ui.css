@@ -27,6 +27,10 @@ body {
     font-family: "Space Grotesk", "Segoe UI", sans-serif;
 }
 
+body.modal-open {
+    overflow: hidden;
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -187,11 +191,64 @@ a {
     border: 1px solid var(--line);
 }
 
+.post-image-trigger {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+    appearance: none;
+    font: inherit;
+}
+
+.post-image-trigger .post-image {
+    display: block;
+}
+
 .post-actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+}
+
+.comment-box {
+    border-top: 1px dashed var(--line);
+    padding-top: 12px;
+}
+
+.comment-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.comment-form .text-input {
+    margin: 0;
+}
+
+.comment-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.comment-list--scroll {
+    max-height: 42vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.comment-item {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
 }
 
 .pill {
@@ -279,6 +336,149 @@ a {
     border: 1px solid var(--line);
 }
 
+.post-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+}
+
+.post-modal[hidden] {
+    display: none;
+}
+
+.post-modal.is-open {
+    animation: modalFadeIn 0.18s ease;
+}
+
+.post-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(18, 16, 14, 0.68);
+    backdrop-filter: blur(6px);
+}
+
+.post-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(1600px, 96vw);
+    height: min(92vh, 940px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.9fr);
+    gap: 0;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 28px;
+    box-shadow: 0 30px 80px rgba(15, 11, 8, 0.35);
+}
+
+.post-modal__media {
+    background: #120f0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    height: 100%;
+}
+
+.post-modal__media img {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: contain;
+}
+
+.post-modal__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #fffdf9 0%, #f9f4eb 100%);
+}
+
+.post-modal__header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.post-modal__caption {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.post-modal__comments {
+    min-height: 0;
+}
+
+.post-modal__comments .comment-form {
+    align-items: stretch;
+}
+
+.post-modal__comments .text-input {
+    min-width: 0;
+}
+
+.post-modal__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    background: rgba(29, 27, 25, 0.8);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 960px) {
+    .post-modal__dialog {
+        grid-template-columns: 1fr;
+        width: min(100%, 760px);
+        height: auto;
+        max-height: 92vh;
+    }
+
+    .post-modal__media {
+        min-height: 280px;
+        max-height: 42vh;
+    }
+}
+
+@media (max-width: 720px) {
+    .post-modal {
+        padding: 10px;
+    }
+
+    .post-modal__sidebar {
+        padding: 16px;
+    }
+
+    .comment-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 .auth-shell {
     min-height: 100vh;
     display: grid;
@@ -360,5 +560,10 @@ a {
     .search-wrap {
         max-width: none;
         width: 100%;
+    }
+
+    .comment-form {
+        flex-direction: column;
+        align-items: stretch;
     }
 }
