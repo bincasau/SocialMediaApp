@@ -31,7 +31,11 @@
                 ><u><a href="/">Home</a></u></b
               ></span
             >
-            <span style="color: white; font-size: 27px"><b>11 Post</b></span>
+            {% if user_post_length %}
+              <span style="color: white; font-size: 27px"><b>{{ user_post_length }} Posts</b></span>
+            {% else %}
+              <span style="color: white; font-size: 27px"><b>No Posts</b></span>
+            {% endif %}
             <span style="color: white; font-size: 27px"
               ><b>1.7m followers</b></span
             >
@@ -131,6 +135,7 @@
                 <div class="col-lg-6">
                   <div class="central-meta">
                     <ul class="photos">
+                      {% for post in user_posts %}
                       <li>
                         <a
                           class="strip"
@@ -140,41 +145,12 @@
                           data-strip-group-options="loop: false"
                         >
                           <img
-                            src="https://cdn.business2community.com/wp-content/uploads/2017/08/blank-profile-picture-973460_640.png"
+                            src="{{ post.image.url }}"
                             style="height: 250px; width: 300px"
                             alt=""
                         /></a>
                       </li>
-
-                      <li>
-                        <a
-                          class="strip"
-                          href="https://cdn.business2community.com/wp-content/uploads/2017/08/blank-profile-picture-973460_640.png"
-                          title=""
-                          data-strip-group="mygroup"
-                          data-strip-group-options="loop: false"
-                        >
-                          <img
-                            src="https://cdn.business2community.com/wp-content/uploads/2017/08/blank-profile-picture-973460_640.png"
-                            style="height: 250px; width: 300px"
-                            alt=""
-                        /></a>
-                      </li>
-
-                      <li>
-                        <a
-                          class="strip"
-                          href="https://cdn.business2community.com/wp-content/uploads/2017/08/blank-profile-picture-973460_640.png"
-                          title=""
-                          data-strip-group="mygroup"
-                          data-strip-group-options="loop: false"
-                        >
-                          <img
-                            src="https://cdn.business2community.com/wp-content/uploads/2017/08/blank-profile-picture-973460_640.png"
-                            style="height: 250px; width: 300px"
-                            alt=""
-                        /></a>
-                      </li>
+                      {% endfor %}
                     </ul>
                     <!--<div class="lodmore"><button class="btn-view btn-load-more"></button></div>-->
                   </div>
@@ -196,7 +172,7 @@
       data-cfasync="false"
       src="{% static '../../cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js' %}"
     ></script>
-    <script src="js/main.min.js"></script>
+    <script src="{% static 'js/main.min.js' %}"></script>
     <script src="{% static 'js/script.js' %}"></script>
   </body>
 </html>
