@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from .models import FollowersCount, Post, Profile, LikePost
 from itertools import chain
+from django.db.models import Count
 
 # Create your views here.
 @login_required(login_url='signin')
@@ -195,3 +196,45 @@ def follow(request):
             return redirect('/profile/' + user)
     else:
         return redirect('/')
+
+
+@login_required(login_url='signin')
+def search(request):
+    query = ''
+
+    if request.method == 'POST':
+        query = request.POST.get('username', '').strip()
+    else:
+        query = request.GET.get('q', '').strip()
+
+    matched_profiles = []
+
+    if query:
+        matched_users = User.objects.filter(username__icontains=query).order_by('username')
+        profiles = Profile.objects.filter(user__in=matched_users).select_related('user')
+
+        usernames = [profile.user.username for profile in profiles]
+        follower_counts = {
+            row['user']: row['total']
+            for row in FollowersCount.objects.filter(user__in=usernames)
+            .values('user')
+            .annotate(total=Count('id'))
+        }
+
+        matched_profiles = [
+            {
+                'profile': profile,
+                'followers': follower_counts.get(profile.user.username, 0),
+            }
+            for profile in profiles
+        ]
+
+    current_user_profile = Profile.objects.filter(user=request.user).first()
+
+    context = {
+        'query': query,
+        'matched_profiles': matched_profiles,
+        'user_profile': current_user_profile,
+    }
+
+    return render(request, 'search.html', context)

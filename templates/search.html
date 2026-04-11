@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+        <title>Search</title>
+        <link href="{% static 'favicon.png' %}" rel="icon" type="image/png" />
+        <link rel="stylesheet" href="{% static 'css/main.min.css' %}" />
+        <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+        <link rel="stylesheet" href="{% static 'css/color.css' %}" />
+        <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    </head>
+    <body>
+        <div class="theme-layout">
+            <section>
+                <div class="gap gray-bg" style="min-height: 100vh;">
+                    <div class="container-fluid">
+                        <div class="row">
+                            <div class="col-lg-2 col-md-1"></div>
+                            <div class="col-lg-8 col-md-10 col-sm-12">
+                                <div class="central-meta" style="margin-top: 24px;">
+                                    <div style="padding: 20px; border-bottom: 1px solid #efefef;">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                            <div>
+                                                <h3 style="margin: 0 0 8px 0; color: #333;">Search Users</h3>
+                                                <p style="margin: 0; color: #777; font-size: 14px;">Find people by username and visit their profile quickly.</p>
+                                            </div>
+                                            <a href="/" title="Go home" style="font-size: 14px; font-weight: 600;">Back to Home</a>
+                                        </div>
+                                    </div>
+
+                                    <div style="padding: 20px; border-bottom: 1px solid #efefef;">
+                                        <form action="/search" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                            <input
+                                                type="text"
+                                                name="q"
+                                                value="{{ query }}"
+                                                placeholder="Type username..."
+                                                style="flex: 1; min-width: 240px; border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px;"
+                                            />
+                                            <button type="submit" class="button soft-primary">Search</button>
+                                        </form>
+                                    </div>
+
+                                    {% if query %}
+                                        <div style="padding: 16px 20px 0 20px;">
+                                            <h4 style="margin: 0; color: #333;">Results for "{{ query }}"</h4>
+                                        </div>
+
+                                        {% if matched_profiles %}
+                                            <ul class="followers" style="padding: 10px 20px 20px 20px; margin: 0;">
+                                                {% for item in matched_profiles %}
+                                                <li style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f2f2f2; flex-wrap: wrap;">
+                                                    <div style="display: flex; align-items: center; gap: 12px; min-width: 220px;">
+                                                        <img
+                                                            src="{{ item.profile.profileimg.url }}"
+                                                            alt="avatar"
+                                                            style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover;"
+                                                        />
+                                                        <div>
+                                                            <h5 style="margin: 0; font-size: 16px; color: #222;">@{{ item.profile.user.username }}</h5>
+                                                            <span style="display: block; color: #707070; font-size: 13px; margin-top: 4px;">
+                                                                {{ item.profile.location|default:'No location yet' }}
+                                                            </span>
+                                                            <span style="display: block; color: #999; font-size: 12px; margin-top: 2px;">
+                                                                {{ item.followers }} follower{{ item.followers|pluralize }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <a href="/profile/{{ item.profile.user.username }}/" class="button soft-success">
+                                                        View Profile
+                                                    </a>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <div style="padding: 16px 20px 22px 20px; color: #666;">
+                                                No users found for this keyword.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div style="padding: 16px 20px 22px 20px; color: #666;">
+                                        Enter a username to start searching.
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-lg-2 col-md-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <script src="{% static 'js/main.min.js' %}"></script>
+        <script src="{% static 'js/script.js' %}"></script>
+    </body>
+</html>
