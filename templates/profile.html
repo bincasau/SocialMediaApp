@@ -38,7 +38,11 @@
               <span style="color: white; font-size: 27px"><b>No Posts</b></span>
             {% endif %}
             <span style="color: white; font-size: 27px">
+              {% if user_followers == 0 or user_followers == 1 %}
+              <b>{{ user_followers }} follower</b>
+              {% else %}
               <b>{{ user_followers }} followers</b>
+              {% endif %}
             </span>
             <span style="color: white; font-size: 27px">
               <b>{{ user_following }} following</b>
@@ -97,7 +101,7 @@
                         font-size: 27px;
                       "
                     >
-                      <b>@{{ user.username }}</b
+                      <b>@{{ user_object.username }}</b
                       ><!--<i class="fa fa-check-circle" style="color: #48dbfb;" aria-hidden="true"></i>-->
                     </h5>
                     <!--<span>Group Admin</span>-->
