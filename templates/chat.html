@@ -1,0 +1,80 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chat with {{ other_user.username }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <h2>Chat with {{ other_user.username }}</h2>
+
+    <div id="messages" style="border:1px solid #ddd; padding:10px; height:400px; overflow:auto;">
+        {% for m in messages %}
+            <div class="message" data-id="{{ m.id }}">
+                <strong>{{ m.sender.username }}:</strong> {{ m.content }} <small>({{ m.timestamp }})</small>
+            </div>
+        {% empty %}
+            <div>No messages yet.</div>
+        {% endfor %}
+    </div>
+
+    <form id="chat-form" style="margin-top:10px;">
+        {% csrf_token %}
+        <input type="hidden" id="recipient" name="recipient" value="{{ other_user.username }}">
+        <textarea id="message-input" name="message" rows="2" style="width:80%;"></textarea>
+        <button id="send-btn" type="submit">Send</button>
+    </form>
+
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const recipient = document.getElementById('recipient').value;
+        const messagesEl = document.getElementById('messages');
+
+        const protocol = (location.protocol === 'https:') ? 'wss' : 'ws';
+        const chatSocket = new WebSocket(`${protocol}://${location.host}/ws/chat/${recipient}/`);
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.dataset.id = data.id;
+            div.innerHTML = `<strong>${data.sender}:</strong> ${data.content} <small>(${new Date(data.timestamp).toLocaleString()})</small>`;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
+
+        chatSocket.onopen = function() {
+            console.log('WebSocket open');
+        };
+
+        chatSocket.onclose = function() {
+            console.log('WebSocket closed');
+        };
+
+        document.getElementById('chat-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = document.getElementById('message-input').value.trim();
+            if (!content) return;
+
+            chatSocket.send(JSON.stringify({ 'message': content }));
+            document.getElementById('message-input').value = '';
+        });
+    </script>
+</body>
+</html>

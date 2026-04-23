@@ -1,12 +1,16 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from .models import FollowersCount, Post, Profile, LikePost, Comment
+from .services.message_service import MessageService
+from .services.user_service import UserService
 from itertools import chain
 from django.db.models import Count
+from django.db.models import Q
+from django.utils import timezone
 import random
 
 
@@ -309,3 +313,47 @@ def search(request):
     }
 
     return render(request, 'search.html', context)
+
+
+@login_required(login_url='signin')
+def chat(request, username):
+    try:
+        other_user = UserService.get_user_by_username(username)
+    except User.DoesNotExist:
+        return redirect('/')
+
+    # initial messages between the two users
+    messages_qs = []
+    messages_qs = MessageService.get_messages_between(request.user, other_user)
+
+    return render(request, 'chat.html', {'other_user': other_user, 'messages': messages_qs})
+
+
+@login_required(login_url='signin')
+def send_message(request):
+    if request.method == 'POST':
+        recipient_username = request.POST.get('recipient')
+        content = request.POST.get('message', '').strip()
+
+        if not recipient_username or not content:
+            return JsonResponse({'ok': False, 'error': 'Missing recipient or content'})
+
+        msg = MessageService.create_message(request.user, recipient_username, content)
+        if msg is None:
+            return JsonResponse({'ok': False, 'error': 'Recipient not found'})
+
+        return JsonResponse({'ok': True, 'message': MessageService.serialize_message(msg)})
+
+    return JsonResponse({'ok': False, 'error': 'Invalid method'})
+
+
+@login_required(login_url='signin')
+def fetch_messages(request, username):
+    other_user = UserService.get_user_by_username(username)
+    if not other_user:
+        return JsonResponse({'ok': False, 'error': 'User not found'})
+
+    messages_qs = MessageService.get_messages_between(request.user, other_user)
+    messages_list = [MessageService.serialize_message(m) for m in messages_qs]
+
+    return JsonResponse({'ok': True, 'messages': messages_list})
