@@ -15,6 +15,11 @@ import random
 
 
 def _attach_comments_to_posts(posts):
+    """Gắn danh sách bình luận đã sắp xếp vào từng đối tượng post.
+
+    Ghi chú: Cách này tránh phải query bình luận lặp lại trong template bằng
+    việc tạo sẵn thuộc tính `comments_list` cho mỗi post.
+    """
     posts = list(posts)
     post_ids = [post.id for post in posts]
 
@@ -35,13 +40,18 @@ def _attach_comments_to_posts(posts):
 # Create your views here.
 @login_required(login_url='signin')
 def index(request):
+    """Render feed trang chủ cho người dùng đã đăng nhập.
+
+    Ghi chú: Feed được ghép từ những người đang theo dõi và bổ sung gợi ý
+    profile để template không phải tự xử lý logic.
+    """
     user_object = User.objects.get(username=request.user.username)
     user_profile = Profile.objects.filter(user=user_object).first()
 
     user_following_list = []
     feed = []
 
-    user_following = FollowersCount.objects.filter(follower=request.user.username)
+    user_following = FollowersCount.objects.filter(follower=request.user)
 
     for user in user_following:
         user_following_list.append(user.user)
@@ -53,8 +63,8 @@ def index(request):
     feed_list = list(chain(*feed))
 
     following_usernames = set(
-        FollowersCount.objects.filter(follower=request.user.username)
-        .values_list('user', flat=True)
+        FollowersCount.objects.filter(follower=request.user)
+        .values_list('user__username', flat=True)
     )
 
     suggested_users = User.objects.exclude(username=request.user.username).exclude(
@@ -68,9 +78,9 @@ def index(request):
 
     suggestion_usernames = [profile.user.username for profile in suggestions_username_profile_list]
     suggestion_followers = {
-        row['user']: row['total']
-        for row in FollowersCount.objects.filter(user__in=suggestion_usernames)
-        .values('user')
+        row['user__username']: row['total']
+        for row in FollowersCount.objects.filter(user__username__in=suggestion_usernames)
+        .values('user__username')
         .annotate(total=Count('id'))
     }
 
@@ -83,6 +93,11 @@ def index(request):
 
 @login_required(login_url='signin')
 def setting(request):
+    """Hiển thị và cập nhật trang cài đặt của người dùng đăng nhập.
+
+    Ghi chú: Luồng đổi ảnh đại diện được xử lý ngay tại đây vì form nhỏ và dễ
+    giữ rõ ràng hơn.
+    """
     user_profile, _ = Profile.objects.get_or_create(
         user=request.user,
         defaults={'id_user': request.user.id}
@@ -115,13 +130,17 @@ def setting(request):
 
 @login_required(login_url='signin')
 def like_post(request):
-    user = request.user.username
+    """Bật hoặc tắt like của người dùng hiện tại trên một bài viết.
+
+    Ghi chú: Bộ đếm like được cập nhật cùng lúc với bản ghi quan hệ để UI
+    không bị lệch sau khi tải lại.
+    """
     post_id = request.GET.get('post_id')
     post = Post.objects.get(id=post_id)
-    like_filter = LikePost.objects.filter(post_id=post_id, username=user).first()
+    like_filter = LikePost.objects.filter(post=post, user=request.user).first()
 
     if like_filter == None:
-        new_like = LikePost.objects.create(post_id=post_id, username=user)
+        new_like = LikePost.objects.create(post=post, user=request.user)
         new_like.save()
         post.no_of_likes = post.no_of_likes + 1
         post.save()
@@ -135,6 +154,11 @@ def like_post(request):
 
 @login_required(login_url='signin')
 def comment_post(request):
+    """Tạo bình luận rồi chuyển hướng về trang gốc.
+
+    Ghi chú: URL `next` được kiểm tra an toàn để tránh redirect sang host
+    không tin cậy.
+    """
     if request.method == 'POST':
         post_id = request.POST.get('post_id')
         comment_body = request.POST.get('comment', '').strip()
@@ -145,7 +169,7 @@ def comment_post(request):
             if post:
                 Comment.objects.create(
                     post=post,
-                    username=request.user.username,
+                    user=request.user,
                     body=comment_body,
                 )
 
@@ -158,21 +182,26 @@ def comment_post(request):
 
 @login_required(login_url='signin')
 def profile(request, username):
+    """Hiển thị trang profile công khai cho username được truyền vào.
+
+    Ghi chú: Trang này nạp sẵn bài viết và số follow để template không phải
+    làm thêm truy vấn cơ sở dữ liệu.
+    """
     user_object = User.objects.get(username=username)
     user_profile = Profile.objects.filter(user=user_object).first()
-    user_posts = _attach_comments_to_posts(Post.objects.filter(user=username))
+    user_posts = _attach_comments_to_posts(Post.objects.filter(user=user_object))
     user_post_length = len(user_posts)
 
-    follower = request.user.username
-    user = username
+    follower = request.user
+    user = user_object
 
     if FollowersCount.objects.filter(follower=follower, user=user).first():
         button_text = 'Unfollow'
     else:
         button_text = 'Follow'
 
-    user_followers = len(FollowersCount.objects.filter(user=username))
-    user_following = len(FollowersCount.objects.filter(follower=username))
+    user_followers = len(FollowersCount.objects.filter(user=user_object))
+    user_following = len(FollowersCount.objects.filter(follower=user_object))
 
     context = {
         'user_object': user_object,
@@ -188,12 +217,16 @@ def profile(request, username):
 
 @login_required(login_url='signin')
 def upload(request):
+    """Tạo bài viết mới từ ảnh upload và phần caption.
+
+    Ghi chú: View này dùng đúng tên field của form upload hiện tại và sẽ trả
+    về sớm nếu request không phải POST.
+    """
     if request.method == 'POST':
-        user = request.user.username
         image = request.FILES.get('image_upload')
         caption = request.POST['caption']
 
-        new_post = Post.objects.create(user=user, image=image, caption=caption)
+        new_post = Post.objects.create(user=request.user, image=image, caption=caption)
         new_post.save()
         return redirect('/')
     else:
@@ -201,6 +234,11 @@ def upload(request):
     return HttpResponse('Upload')
 
 def signup(request):
+    """Xử lý đăng ký tài khoản và tạo profile ban đầu.
+
+    Ghi chú: Gom bước tạo account và khởi tạo profile vào cùng một chỗ để
+    app luôn có `Profile` tương ứng sau khi đăng ký.
+    """
     if request.method == 'POST':
 
         username = request.POST['username']
@@ -234,6 +272,11 @@ def signup(request):
     else : return render(request, 'signup.html')
 
 def signin(request):
+    """Xác thực người dùng và khởi tạo session.
+
+    Ghi chú: Thông tin đăng nhập sai được coi là luồng bình thường và quay
+    lại màn hình đăng nhập kèm thông báo.
+    """
     if request.method == 'POST':
         username = request.POST['username']
         password = request.POST['password']
@@ -252,29 +295,49 @@ def signin(request):
     
 @login_required(login_url='signin')
 def logout(request):
+    """Đăng xuất người dùng hiện tại và chuyển về trang đăng nhập.
+
+    Ghi chú: View này rất nhỏ vì Django auth backend đã xử lý phần kết thúc
+    session.
+    """
     auth.logout(request)
     return redirect('signin')
 
 @login_required(login_url='signin')
 def follow(request):
+    """Tạo hoặc xoá quan hệ follow giữa hai người dùng.
+
+    Ghi chú: Dữ liệu POST dùng username nên view phải đổi sang user object
+    trước khi thao tác với các dòng foreign key.
+    """
     if request.method == 'POST':
-        follower = request.POST['follower']
-        user = request.POST['user']
+        follower_username = request.POST['follower']
+        user_username = request.POST['user']
+        follower = User.objects.filter(username=follower_username).first()
+        user = User.objects.filter(username=user_username).first()
+
+        if follower is None or user is None:
+            return redirect('/')
 
         if FollowersCount.objects.filter(follower=follower, user=user).first():
             delete_follower = FollowersCount.objects.get(follower=follower, user=user)
             delete_follower.delete()
-            return redirect('/profile/' + user)
+            return redirect('/profile/' + user.username)
         else:
             new_follower = FollowersCount.objects.create(follower=follower, user=user)
             new_follower.save()
-            return redirect('/profile/' + user)
+            return redirect('/profile/' + user.username)
     else:
         return redirect('/')
 
 
 @login_required(login_url='signin')
 def search(request):
+    """Tìm profile theo username và gắn thêm số lượng follower.
+
+    Ghi chú: Danh sách kết quả được dựng bằng Python để phần render template
+    đơn giản và có kết quả ổn định.
+    """
     query = ''
 
     if request.method == 'POST':
@@ -288,11 +351,11 @@ def search(request):
         matched_users = User.objects.filter(username__icontains=query).order_by('username')
         profiles = Profile.objects.filter(user__in=matched_users).select_related('user')
 
-        usernames = [profile.user.username for profile in profiles]
+        matched_usernames = [profile.user.username for profile in profiles]
         follower_counts = {
-            row['user']: row['total']
-            for row in FollowersCount.objects.filter(user__in=usernames)
-            .values('user')
+            row['user__username']: row['total']
+            for row in FollowersCount.objects.filter(user__username__in=matched_usernames)
+            .values('user__username')
             .annotate(total=Count('id'))
         }
 
@@ -317,9 +380,13 @@ def search(request):
 
 @login_required(login_url='signin')
 def chat(request, username):
-    try:
-        other_user = UserService.get_user_by_username(username)
-    except User.DoesNotExist:
+    """Hiển thị lịch sử chat giữa người dùng hiện tại và một người khác.
+
+    Ghi chú: User không tồn tại sẽ được chuyển hướng sớm để template chỉ nhận
+    được một đối tượng chat hợp lệ.
+    """
+    other_user = UserService.get_user_by_username(username)
+    if other_user is None:
         return redirect('/')
 
     # initial messages between the two users
@@ -331,6 +398,11 @@ def chat(request, username):
 
 @login_required(login_url='signin')
 def send_message(request):
+    """Nhận tin nhắn chat và trả về phản hồi JSON.
+
+    Ghi chú: Endpoint này chỉ trả JSON để front-end gọi được mà không cần tải
+    lại toàn bộ trang.
+    """
     if request.method == 'POST':
         recipient_username = request.POST.get('recipient')
         content = request.POST.get('message', '').strip()
@@ -349,6 +421,11 @@ def send_message(request):
 
 @login_required(login_url='signin')
 def fetch_messages(request, username):
+    """Trả về lịch sử hội thoại với một người dùng dưới dạng JSON.
+
+    Ghi chú: Payload được serialize qua `MessageService` để phản hồi đồng
+    nhất với `send_message`.
+    """
     other_user = UserService.get_user_by_username(username)
     if not other_user:
         return JsonResponse({'ok': False, 'error': 'User not found'})

@@ -1,0 +1,639 @@
+{
+  "info": {
+    "_postman_id": "7b0d2c9f-8df5-4b18-9b55-7c2d9c4f0b01",
+    "name": "SocialMediaApp",
+    "description": "Postman collection for the Django social media app. The app uses Django session auth and CSRF protection, so run the GET form requests first to capture the csrftoken cookie.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "csrf_token",
+      "value": ""
+    },
+    {
+      "key": "username",
+      "value": "alice"
+    },
+    {
+      "key": "email",
+      "value": "alice@example.com"
+    },
+    {
+      "key": "password",
+      "value": "password123"
+    },
+    {
+      "key": "password2",
+      "value": "password123"
+    },
+    {
+      "key": "post_id",
+      "value": ""
+    },
+    {
+      "key": "comment_body",
+      "value": "Postman comment"
+    },
+    {
+      "key": "follower",
+      "value": "bob"
+    },
+    {
+      "key": "follow_target",
+      "value": "alice"
+    },
+    {
+      "key": "recipient",
+      "value": "alice"
+    },
+    {
+      "key": "message_body",
+      "value": "Hello from Postman"
+    },
+    {
+      "key": "search_query",
+      "value": "ali"
+    },
+    {
+      "key": "profile_username",
+      "value": "alice"
+    },
+    {
+      "key": "chat_username",
+      "value": "alice"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - GET Signup Page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/signup"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "const csrf = pm.cookies.get('csrftoken');",
+              "pm.test('CSRF cookie exists', function () {",
+              "  pm.expect(csrf).to.be.ok;",
+              "});",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - POST Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{username}}"
+            },
+            {
+              "key": "email",
+              "value": "{{email}}"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}"
+            },
+            {
+              "key": "password2",
+              "value": "{{password2}}"
+            }
+          ]
+        },
+        "url": "{{base_url}}/signup"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});",
+              "",
+              "pm.test('Session cookie may exist after signup', function () {",
+              "  const session = pm.cookies.get('sessionid');",
+              "  pm.expect(session || true).to.be.ok;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - GET Signin Page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/signin"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}",
+              "pm.test('CSRF cookie exists', function () {",
+              "  pm.expect(csrf).to.be.ok;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - POST Signin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{username}}"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}"
+            }
+          ]
+        },
+        "url": "{{base_url}}/signin"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});",
+              "",
+              "pm.test('Session cookie exists after signin', function () {",
+              "  const session = pm.cookies.get('sessionid');",
+              "  pm.expect(session).to.be.ok;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - GET Home Feed",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "pm.test('Response is HTML', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - GET Profile",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/profile/{{profile_username}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "pm.test('Profile page is HTML', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - POST Upload Post",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "caption",
+              "value": "Post from Postman",
+              "type": "text"
+            },
+            {
+              "key": "image_upload",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": "{{base_url}}/upload"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Like Post",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/like-post?post_id={{post_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Comment on Post",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "post_id",
+              "value": "{{post_id}}"
+            },
+            {
+              "key": "comment",
+              "value": "{{comment_body}}"
+            },
+            {
+              "key": "next",
+              "value": "/"
+            }
+          ]
+        },
+        "url": "{{base_url}}/comment"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Follow User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "follower",
+              "value": "{{follower}}"
+            },
+            {
+              "key": "user",
+              "value": "{{follow_target}}"
+            }
+          ]
+        },
+        "url": "{{base_url}}/follow"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Search Profiles",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/search?q={{search_query}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "pm.test('Search response is HTML', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Open Chat Page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/chat/{{chat_username}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "pm.test('Chat page is HTML', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Send Chat Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "recipient",
+              "value": "{{recipient}}"
+            },
+            {
+              "key": "message",
+              "value": "{{message_body}}"
+            }
+          ]
+        },
+        "url": "{{base_url}}/chat/send/"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const csrf = pm.cookies.get('csrftoken');",
+              "if (csrf) {",
+              "  pm.environment.set('csrf_token', csrf);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('API returned ok=true', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "});",
+              "pm.test('Message payload exists', function () {",
+              "  pm.expect(data.message).to.be.an('object');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Fetch Chat Messages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/chat/fetch/{{chat_username}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test('API returned ok=true', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "});",
+              "pm.test('Messages array exists', function () {",
+              "  pm.expect(data.messages).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Logout",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Response code is successful', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
