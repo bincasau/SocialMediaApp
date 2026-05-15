@@ -37,6 +37,10 @@ def _attach_comments_to_posts(posts):
 
     return posts
 
+
+def health(request):
+    return JsonResponse({'ok': True})
+
 # Create your views here.
 @login_required(login_url='signin')
 def index(request):
