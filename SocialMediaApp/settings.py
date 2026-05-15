@@ -12,8 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-
-import dj_database_url
+from urllib.parse import urlparse, unquote
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -102,11 +101,18 @@ CHANNEL_LAYERS = {
 
 database_url = os.getenv('DATABASE_URL')
 if database_url:
+    parsed = urlparse(database_url)
     DATABASES = {
-        'default': dj_database_url.config(
-            default=database_url,
-            conn_max_age=600,
-        )
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': unquote(parsed.username or ''),
+            'PASSWORD': unquote(parsed.password or ''),
+            'HOST': parsed.hostname or '',
+            'PORT': parsed.port or '',
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'sslmode': 'require'},
+        }
     }
 else:
     DATABASES = {

@@ -2,7 +2,6 @@ Django
 Pillow
 channels
 channels_redis
-dj-database-url
 psycopg[binary]
 redis
 whitenoise
