@@ -26,7 +26,17 @@ SECRET_KEY = 'django-insecure-5f_je4&pcbtg@+k+&cs^^!8d9tf=m=i%b8ej!^@gwj(-tzarak
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.vercel.app']
+
+csrf_trusted_origins_env = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '')
+if csrf_trusted_origins_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_origins_env.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = ['https://*.vercel.app']
 
 
 # Application definition
