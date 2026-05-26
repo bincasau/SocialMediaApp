@@ -49,6 +49,13 @@ class SocialMediaBasicTests(TestCase):
         image.save(buffer, format='PNG')
         return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/png')
 
+    def _log(self, title, details=None):
+        """Log kết quả theo format dễ quan sát khi chạy test."""
+        message = f"[TEST] {title}"
+        if details:
+            message = f"{message} | {details}"
+        print(message)
+
     def test_profile_creation(self):
         """Kiểm tra profile được gắn đúng với user tương ứng.
 
@@ -57,6 +64,10 @@ class SocialMediaBasicTests(TestCase):
         profile = Profile.objects.get(user=self.user1)
         self.assertEqual(profile.bio, 'Xin chao, toi la Alice')
         self.assertEqual(profile.user.username, 'alice')
+        self._log(
+            'Profile creation',
+            f"user={profile.user.username}, bio='{profile.bio}'",
+        )
 
     def test_like_post(self):
         """Kiểm tra bật/tắt like có cập nhật đúng bộ đếm bài viết.
@@ -70,6 +81,10 @@ class SocialMediaBasicTests(TestCase):
         self.assertTrue(liked)
         self.assertEqual(LikePost.objects.count(), 1)
         self.assertEqual(self.post.no_of_likes, 1)
+        self._log(
+            'Toggle like',
+            f"liked={liked}, likes={self.post.no_of_likes}",
+        )
 
     def test_add_comment(self):
         """Kiểm tra bình luận được tạo đúng với user và bài viết mong muốn.
@@ -84,6 +99,10 @@ class SocialMediaBasicTests(TestCase):
         self.assertEqual(comment.body, 'Tuyet voi qua!')
         self.assertEqual(comment.post, self.post)
         self.assertEqual(comment.user, self.user2)
+        self._log(
+            'Add comment',
+            f"user={comment.user.username}, body='{comment.body}'",
+        )
 
     def test_follow_user(self):
         """Kiểm tra quan hệ follow và các hàm hỗ trợ hoạt động đúng.
@@ -101,6 +120,10 @@ class SocialMediaBasicTests(TestCase):
         self.assertEqual(follow.user.username, 'alice')
         self.assertTrue(UserService.is_following('bob', 'alice'))
         self.assertEqual(UserService.followers_count('alice'), 1)
+        self._log(
+            'Follow user',
+            f"follower={follow.follower.username}, user={follow.user.username}, count=1",
+        )
 
     def test_send_message(self):
         """Kiểm tra gửi tin nhắn trực tiếp và truy vấn lại cuộc hội thoại.
@@ -118,3 +141,7 @@ class SocialMediaBasicTests(TestCase):
         self.assertEqual(msg.content, 'Hello Alice, how are you?')
         self.assertFalse(msg.is_read)
         self.assertEqual(messages.count(), 1)
+        self._log(
+            'Send message',
+            f"from={msg.sender.username}, to={msg.recipient.username}, total={messages.count()}",
+        )
