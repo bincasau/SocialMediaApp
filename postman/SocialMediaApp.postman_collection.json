@@ -15,6 +15,10 @@
       "value": ""
     },
     {
+      "key": "csrf_cookie",
+      "value": ""
+    },
+    {
       "key": "username",
       "value": "alice"
     },
@@ -40,15 +44,15 @@
     },
     {
       "key": "follower",
-      "value": "bob"
+      "value": "testuser2"
     },
     {
       "key": "follow_target",
-      "value": "alice"
+      "value": "testuser"
     },
     {
       "key": "recipient",
-      "value": "alice"
+      "value": "testuser2"
     },
     {
       "key": "message_body",
@@ -56,15 +60,15 @@
     },
     {
       "key": "search_query",
-      "value": "ali"
+      "value": "test"
     },
     {
       "key": "profile_username",
-      "value": "alice"
+      "value": "testuser"
     },
     {
       "key": "chat_username",
-      "value": "alice"
+      "value": "testuser2"
     }
   ],
   "item": [
@@ -91,6 +95,7 @@
               "});",
               "if (csrf) {",
               "  pm.environment.set('csrf_token', csrf);",
+              "  pm.environment.set('csrf_cookie', 'csrftoken=' + csrf);",
               "}"
             ]
           }
@@ -102,6 +107,10 @@
       "request": {
         "method": "POST",
         "header": [
+          {
+            "key": "Cookie",
+            "value": "{{csrf_cookie}}"
+          },
           {
             "key": "X-CSRFToken",
             "value": "{{csrf_token}}"
@@ -139,6 +148,7 @@
               "const csrf = pm.cookies.get('csrftoken');",
               "if (csrf) {",
               "  pm.environment.set('csrf_token', csrf);",
+              "  pm.environment.set('csrf_cookie', 'csrftoken=' + csrf);",
               "}"
             ]
           }
@@ -154,7 +164,7 @@
               "",
               "pm.test('Session cookie may exist after signup', function () {",
               "  const session = pm.cookies.get('sessionid');",
-              "  pm.expect(session || true).to.be.ok;",
+              "  pm.expect(session).to.be.ok;",
               "});"
             ]
           }

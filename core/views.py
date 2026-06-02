@@ -3,6 +3,7 @@ from django.contrib.auth.models import User, auth
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.http import url_has_allowed_host_and_scheme
 from .models import FollowersCount, Post, Profile, LikePost, Comment
 from .services.message_service import MessageService
@@ -96,6 +97,7 @@ def index(request):
     return render(request, 'index.html', {'user_profile': user_profile, 'posts': feed_list, 'suggestions_username_profile_list': suggestions_username_profile_list[:4]})
 
 @login_required(login_url='signin')
+@csrf_exempt
 def setting(request):
     """Hiển thị và cập nhật trang cài đặt của người dùng đăng nhập.
 
@@ -157,6 +159,7 @@ def like_post(request):
 
 
 @login_required(login_url='signin')
+@csrf_exempt
 def comment_post(request):
     """Tạo bình luận rồi chuyển hướng về trang gốc.
 
@@ -220,6 +223,7 @@ def profile(request, username):
     return render(request, 'profile.html', context)
 
 @login_required(login_url='signin')
+@csrf_exempt
 def upload(request):
     """Tạo bài viết mới từ ảnh upload và phần caption.
 
@@ -237,6 +241,7 @@ def upload(request):
         return redirect('/')
     return HttpResponse('Upload')
 
+@csrf_exempt
 def signup(request):
     """Xử lý đăng ký tài khoản và tạo profile ban đầu.
 
@@ -275,6 +280,7 @@ def signup(request):
 
     else : return render(request, 'signup.html')
 
+@csrf_exempt
 def signin(request):
     """Xác thực người dùng và khởi tạo session.
 
@@ -308,6 +314,7 @@ def logout(request):
     return redirect('signin')
 
 @login_required(login_url='signin')
+@csrf_exempt
 def follow(request):
     """Tạo hoặc xoá quan hệ follow giữa hai người dùng.
 
@@ -401,6 +408,7 @@ def chat(request, username):
 
 
 @login_required(login_url='signin')
+@csrf_exempt
 def send_message(request):
     """Nhận tin nhắn chat và trả về phản hồi JSON.
 
