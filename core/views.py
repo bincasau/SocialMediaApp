@@ -158,14 +158,15 @@ def like_post(request):
         return redirect('/')
 
 
-@login_required(login_url='signin')
-@csrf_exempt
 def comment_post(request):
     """Tạo bình luận rồi chuyển hướng về trang gốc.
 
     Ghi chú: URL `next` được kiểm tra an toàn để tránh redirect sang host
     không tin cậy.
     """
+    if not request.user.is_authenticated:
+        return JsonResponse({'ok': False, 'error': 'Authentication required'}, status=401)
+
     if request.method == 'POST':
         post_id = request.POST.get('post_id')
         comment_body = request.POST.get('comment', '').strip()

@@ -31,7 +31,7 @@ allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
 if allowed_hosts_env:
     ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.railway.app', '.up.railway.app', '.vercel.app', 'healthcheck.railway.app']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', '.railway.app', '.up.railway.app', '.vercel.app', 'healthcheck.railway.app']
 
 csrf_trusted_origins_env = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '')
 if csrf_trusted_origins_env:
@@ -50,8 +50,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'core'
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

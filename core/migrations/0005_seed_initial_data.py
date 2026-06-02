@@ -1,5 +1,6 @@
 import base64
 
+from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
 from django.db import migrations
 
@@ -24,28 +25,29 @@ def seed_initial_data(apps, schema_editor):
             'email': 'admin@uit.edu.vn',
             'is_staff': True,
             'is_superuser': True,
+            'password': make_password('admin123'),
         },
     )
     if not admin.password:
-        admin.set_password('admin123')
+        admin.password = make_password('admin123')
         admin.save(update_fields=['password'])
     Profile.objects.get_or_create(user=admin, defaults={'id_user': admin.id})
 
     test_user, _ = User.objects.get_or_create(
         username='testuser',
-        defaults={'email': 'testuser@uit.edu.vn'},
+        defaults={'email': 'testuser@uit.edu.vn', 'password': make_password('test1234')},
     )
     if not test_user.password:
-        test_user.set_password('test1234')
+        test_user.password = make_password('test1234')
         test_user.save(update_fields=['password'])
     Profile.objects.get_or_create(user=test_user, defaults={'id_user': test_user.id})
 
     test_user_2, _ = User.objects.get_or_create(
         username='testuser2',
-        defaults={'email': 'testuser2@uit.edu.vn'},
+        defaults={'email': 'testuser2@uit.edu.vn', 'password': make_password('test1234')},
     )
     if not test_user_2.password:
-        test_user_2.set_password('test1234')
+        test_user_2.password = make_password('test1234')
         test_user_2.save(update_fields=['password'])
     Profile.objects.get_or_create(user=test_user_2, defaults={'id_user': test_user_2.id})
 

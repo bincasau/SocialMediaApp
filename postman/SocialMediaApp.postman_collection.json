@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "7b0d2c9f-8df5-4b18-9b55-7c2d9c4f0b01",
-    "name": "SocialMediaApp",
-    "description": "Postman collection for the Django social media app. The app uses Django session auth and CSRF protection, so run the GET form requests first to capture the csrftoken cookie.",
+    "name": "SocialMediaApp API",
+    "description": "Postman collection for the current DRF API under /api/. The repeatable flow uses seeded users testuser/test1234 and testuser2/test1234. Requests that require authentication use Basic Auth, so CSRF tokens are not needed.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,73 +11,61 @@
       "value": "http://127.0.0.1:8000"
     },
     {
-      "key": "csrf_token",
-      "value": ""
-    },
-    {
-      "key": "csrf_cookie",
-      "value": ""
-    },
-    {
       "key": "username",
-      "value": "alice"
-    },
-    {
-      "key": "email",
-      "value": "alice@example.com"
-    },
-    {
-      "key": "password",
-      "value": "password123"
-    },
-    {
-      "key": "password2",
-      "value": "password123"
-    },
-    {
-      "key": "post_id",
-      "value": ""
-    },
-    {
-      "key": "comment_body",
-      "value": "Postman comment"
-    },
-    {
-      "key": "follower",
-      "value": "testuser2"
-    },
-    {
-      "key": "follow_target",
       "value": "testuser"
     },
     {
-      "key": "recipient",
+      "key": "password",
+      "value": "test1234"
+    },
+    {
+      "key": "register_username",
+      "value": "postman_{{$timestamp}}"
+    },
+    {
+      "key": "register_email",
+      "value": "postman_{{$timestamp}}@example.com"
+    },
+    {
+      "key": "register_password",
+      "value": "password123"
+    },
+    {
+      "key": "other_username",
       "value": "testuser2"
     },
     {
+      "key": "post_id",
+      "value": "fccbf41b-a718-48c7-89a9-15046c5c7d75"
+    },
+    {
+      "key": "post_caption",
+      "value": "Postman upload with image"
+    },
+    {
+      "key": "post_image_path",
+      "value": "static/assets/images/post/img1.jpg"
+    },
+    {
+      "key": "comment_body",
+      "value": "Postman API comment"
+    },
+    {
       "key": "message_body",
-      "value": "Hello from Postman"
+      "value": "Hello from Postman API"
     },
     {
       "key": "search_query",
       "value": "test"
-    },
-    {
-      "key": "profile_username",
-      "value": "testuser"
-    },
-    {
-      "key": "chat_username",
-      "value": "testuser2"
     }
   ],
   "item": [
     {
-      "name": "01 - GET Signup Page",
+      "name": "01 - Health",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/signup"
+        "url": "{{base_url}}/api/health/"
       },
       "event": [
         {
@@ -88,95 +76,125 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
-              "const csrf = pm.cookies.get('csrftoken');",
-              "pm.test('CSRF cookie exists', function () {",
-              "  pm.expect(csrf).to.be.ok;",
-              "});",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "  pm.environment.set('csrf_cookie', 'csrftoken=' + csrf);",
-              "}"
+              "const data = pm.response.json();",
+              "pm.test('API is healthy', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "});"
             ]
           }
         }
       ]
     },
     {
-      "name": "02 - POST Signup",
+      "name": "02 - Register New User",
       "request": {
+        "auth": {
+          "type": "noauth"
+        },
         "method": "POST",
         "header": [
           {
-            "key": "Cookie",
-            "value": "{{csrf_cookie}}"
-          },
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
+            "key": "Content-Type",
+            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{register_username}}\",\n  \"email\": \"{{register_email}}\",\n  \"password\": \"{{register_password}}\",\n  \"password2\": \"{{register_password}}\"\n}"
+        },
+        "url": "{{base_url}}/api/auth/register/"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const unique = 'postman_' + Date.now();",
+              "pm.environment.set('register_username', unique);",
+              "pm.environment.set('register_email', unique + '@example.com');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201', function () {",
+              "  pm.expect(pm.response.code).to.equal(201);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Register returns user and profile', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.user.username).to.eql(pm.variables.get('register_username'));",
+              "  pm.expect(data.profile).to.be.an('object');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Login Seed User",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": "{{base_url}}/api/auth/login/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Login returns seed user', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.user.username).to.eql(pm.variables.get('username'));",
+              "  pm.expect(data.profile).to.be.an('object');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Me",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
             {
               "key": "username",
-              "value": "{{username}}"
-            },
-            {
-              "key": "email",
-              "value": "{{email}}"
+              "value": "{{username}}",
+              "type": "string"
             },
             {
               "key": "password",
-              "value": "{{password}}"
-            },
-            {
-              "key": "password2",
-              "value": "{{password2}}"
+              "value": "{{password}}",
+              "type": "string"
             }
           ]
         },
-        "url": "{{base_url}}/signup"
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "  pm.environment.set('csrf_cookie', 'csrftoken=' + csrf);",
-              "}"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
-              "});",
-              "",
-              "pm.test('Session cookie may exist after signup', function () {",
-              "  const session = pm.cookies.get('sessionid');",
-              "  pm.expect(session).to.be.ok;",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "03 - GET Signin Page",
-      "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/signin"
+        "url": "{{base_url}}/api/me/"
       },
       "event": [
         {
@@ -187,13 +205,10 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}",
-              "pm.test('CSRF cookie exists', function () {",
-              "  pm.expect(csrf).to.be.ok;",
+              "const data = pm.response.json();",
+              "pm.test('Current user matches auth user', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.user.username).to.eql(pm.variables.get('username'));",
               "});"
             ]
           }
@@ -201,67 +216,26 @@
       ]
     },
     {
-      "name": "04 - POST Signin",
+      "name": "05 - List All Posts And Save Post ID",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
-          }
-        ],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
+        "auth": {
+          "type": "basic",
+          "basic": [
             {
               "key": "username",
-              "value": "{{username}}"
+              "value": "{{username}}",
+              "type": "string"
             },
             {
               "key": "password",
-              "value": "{{password}}"
+              "value": "{{password}}",
+              "type": "string"
             }
           ]
         },
-        "url": "{{base_url}}/signin"
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
-              "});",
-              "",
-              "pm.test('Session cookie exists after signin', function () {",
-              "  const session = pm.cookies.get('sessionid');",
-              "  pm.expect(session).to.be.ok;",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "05 - GET Home Feed",
-      "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/"
+        "url": "{{base_url}}/api/posts/?scope=all"
       },
       "event": [
         {
@@ -272,21 +246,41 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
-              "pm.test('Response is HTML', function () {",
-              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
-              "});"
+              "const data = pm.response.json();",
+              "pm.test('Posts array exists', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.posts).to.be.an('array');",
+              "  pm.expect(data.posts.length).to.be.above(0);",
+              "});",
+              "if (data.posts && data.posts.length > 0) {",
+              "  pm.environment.set('post_id', data.posts[0].id);",
+              "}"
             ]
           }
         }
       ]
     },
     {
-      "name": "06 - GET Profile",
+      "name": "06 - Get Post Detail",
       "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/profile/{{profile_username}}/"
+        "url": "{{base_url}}/api/posts/{{post_id}}/"
       },
       "event": [
         {
@@ -297,9 +291,10 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
-              "pm.test('Profile page is HTML', function () {",
-              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+              "const data = pm.response.json();",
+              "pm.test('Post detail matches saved post_id', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.post.id).to.eql(pm.environment.get('post_id') || pm.variables.get('post_id'));",
               "});"
             ]
           }
@@ -307,52 +302,41 @@
       ]
     },
     {
-      "name": "07 - POST Upload Post",
+      "name": "07 - Like Or Unlike Post",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
-          }
-        ],
-        "body": {
-          "mode": "formdata",
-          "formdata": [
+        "auth": {
+          "type": "basic",
+          "basic": [
             {
-              "key": "caption",
-              "value": "Post from Postman",
-              "type": "text"
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
             },
             {
-              "key": "image_upload",
-              "type": "file",
-              "src": ""
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
             }
           ]
         },
-        "url": "{{base_url}}/upload"
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/api/posts/{{post_id}}/like/"
       },
       "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}"
-            ]
-          }
-        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Like toggle response is valid', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.liked).to.be.a('boolean');",
+              "  pm.expect(data.no_of_likes).to.be.a('number');",
               "});"
             ]
           }
@@ -360,11 +344,77 @@
       ]
     },
     {
-      "name": "08 - Like Post",
+      "name": "08 - Create Comment",
       "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"body\": \"{{comment_body}}\"\n}"
+        },
+        "url": "{{base_url}}/api/posts/{{post_id}}/comments/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201', function () {",
+              "  pm.expect(pm.response.code).to.equal(201);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Comment is created', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.comment.body).to.eql(pm.variables.get('comment_body'));",
+              "  pm.expect(data.comment.post_id).to.eql(pm.environment.get('post_id') || pm.variables.get('post_id'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - List Comments",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/like-post?post_id={{post_id}}"
+        "url": "{{base_url}}/api/posts/{{post_id}}/comments/"
       },
       "event": [
         {
@@ -372,8 +422,13 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Comments array exists', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.comments).to.be.an('array');",
               "});"
             ]
           }
@@ -381,105 +436,41 @@
       ]
     },
     {
-      "name": "09 - Comment on Post",
+      "name": "10 - Get Profile",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
-          }
-        ],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
+        "auth": {
+          "type": "basic",
+          "basic": [
             {
-              "key": "post_id",
-              "value": "{{post_id}}"
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
             },
             {
-              "key": "comment",
-              "value": "{{comment_body}}"
-            },
-            {
-              "key": "next",
-              "value": "/"
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
             }
           ]
         },
-        "url": "{{base_url}}/comment"
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/profiles/{{other_username}}/"
       },
       "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}"
-            ]
-          }
-        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "10 - Follow User",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
-          }
-        ],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
-            {
-              "key": "follower",
-              "value": "{{follower}}"
-            },
-            {
-              "key": "user",
-              "value": "{{follow_target}}"
-            }
-          ]
-        },
-        "url": "{{base_url}}/follow"
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Profile response is valid', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.profile.user.username).to.eql(pm.variables.get('other_username'));",
+              "  pm.expect(data.posts).to.be.an('array');",
               "});"
             ]
           }
@@ -489,91 +480,26 @@
     {
       "name": "11 - Search Profiles",
       "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/search?q={{search_query}}"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Status code is 200', function () {",
-              "  pm.expect(pm.response.code).to.equal(200);",
-              "});",
-              "",
-              "pm.test('Search response is HTML', function () {",
-              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "12 - Open Chat Page",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/chat/{{chat_username}}/"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Status code is 200', function () {",
-              "  pm.expect(pm.response.code).to.equal(200);",
-              "});",
-              "",
-              "pm.test('Chat page is HTML', function () {",
-              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "13 - Send Chat Message",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-CSRFToken",
-            "value": "{{csrf_token}}"
-          }
-        ],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
+        "auth": {
+          "type": "basic",
+          "basic": [
             {
-              "key": "recipient",
-              "value": "{{recipient}}"
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
             },
             {
-              "key": "message",
-              "value": "{{message_body}}"
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
             }
           ]
         },
-        "url": "{{base_url}}/chat/send/"
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/search/?q={{search_query}}"
       },
       "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const csrf = pm.cookies.get('csrftoken');",
-              "if (csrf) {",
-              "  pm.environment.set('csrf_token', csrf);",
-              "}"
-            ]
-          }
-        },
         {
           "listen": "test",
           "script": {
@@ -582,13 +508,11 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
               "const data = pm.response.json();",
-              "pm.test('API returned ok=true', function () {",
+              "pm.test('Search response is valid', function () {",
               "  pm.expect(data.ok).to.eql(true);",
-              "});",
-              "pm.test('Message payload exists', function () {",
-              "  pm.expect(data.message).to.be.an('object');",
+              "  pm.expect(data.query).to.eql(pm.variables.get('search_query'));",
+              "  pm.expect(data.results).to.be.an('array');",
               "});"
             ]
           }
@@ -596,11 +520,35 @@
       ]
     },
     {
-      "name": "14 - Fetch Chat Messages",
+      "name": "12 - Toggle Follow User",
       "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/chat/fetch/{{chat_username}}/"
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{other_username}}\"\n}"
+        },
+        "url": "{{base_url}}/api/follow/toggle/"
       },
       "event": [
         {
@@ -611,12 +559,103 @@
               "pm.test('Status code is 200', function () {",
               "  pm.expect(pm.response.code).to.equal(200);",
               "});",
-              "",
               "const data = pm.response.json();",
-              "pm.test('API returned ok=true', function () {",
+              "pm.test('Follow toggle response is valid', function () {",
               "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.following).to.be.a('boolean');",
+              "  pm.expect(data.followers_count).to.be.a('number');",
+              "  pm.expect(data.following_count).to.be.a('number');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Send Message",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"recipient\": \"{{other_username}}\",\n  \"message\": \"{{message_body}}\"\n}"
+        },
+        "url": "{{base_url}}/api/messages/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201', function () {",
+              "  pm.expect(pm.response.code).to.equal(201);",
               "});",
-              "pm.test('Messages array exists', function () {",
+              "const data = pm.response.json();",
+              "pm.test('Message is created', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.message.content).to.eql(pm.variables.get('message_body'));",
+              "  pm.expect(data.message.recipient.username).to.eql(pm.variables.get('other_username'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Fetch Message Thread",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/messages/{{other_username}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Message thread exists', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
               "  pm.expect(data.messages).to.be.an('array');",
               "});"
             ]
@@ -625,11 +664,42 @@
       ]
     },
     {
-      "name": "15 - Logout",
+      "name": "15 - Create Post With Image",
       "request": {
-        "method": "GET",
+        "description": "Creates a post with multipart/form-data. If Postman cannot resolve the variable path, select a local image file for image_upload before sending.",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
         "header": [],
-        "url": "{{base_url}}/logout"
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "caption",
+              "value": "{{post_caption}}",
+              "type": "text"
+            },
+            {
+              "key": "image_upload",
+              "type": "file",
+              "src": "{{post_image_path}}"
+            }
+          ]
+        },
+        "url": "{{base_url}}/api/posts/"
       },
       "event": [
         {
@@ -637,8 +707,110 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Response code is successful', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 302, 303]);",
+              "pm.test('Status code is 201', function () {",
+              "  pm.expect(pm.response.code).to.equal(201);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Post is created with image', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
+              "  pm.expect(data.post).to.be.an('object');",
+              "  pm.expect(data.post.id).to.be.a('string');",
+              "  pm.expect(data.post.caption).to.eql(pm.variables.get('post_caption'));",
+              "  pm.expect(data.post.image).to.be.a('string');",
+              "});",
+              "if (data.post && data.post.id) {",
+              "  pm.environment.set('post_id', data.post.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - Create Post Missing Image Validation",
+      "request": {
+        "description": "Automated validation check for the post creation endpoint without an image file.",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"caption\": \"Postman upload validation\"\n}"
+        },
+        "url": "{{base_url}}/api/posts/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400 without image', function () {",
+              "  pm.expect(pm.response.code).to.equal(400);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Validation error is returned', function () {",
+              "  pm.expect(data.ok).to.eql(false);",
+              "  pm.expect(data.error).to.eql('Missing image or caption');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Logout",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/api/auth/logout/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.expect(pm.response.code).to.equal(200);",
+              "});",
+              "const data = pm.response.json();",
+              "pm.test('Logout returns ok=true', function () {",
+              "  pm.expect(data.ok).to.eql(true);",
               "});"
             ]
           }

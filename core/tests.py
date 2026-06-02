@@ -2,8 +2,10 @@ from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client
 from django.test import TestCase
 from PIL import Image
+from rest_framework.test import APIClient
 
 from core.models import Comment, FollowersCount, LikePost, Message, Post, Profile
 from core.services.message_service import MessageService
@@ -104,6 +106,48 @@ class SocialMediaBasicTests(TestCase):
             f"user={comment.user.username}, body='{comment.body}'",
         )
 
+    def test_comment_requires_authentication(self):
+        """Kiểm tra endpoint comment API không cho phép tạo bình luận khi chưa đăng nhập.
+
+        Ghi chú: Test này bảo vệ việc Postman hoặc client bên ngoài không thể
+        tạo comment chỉ bằng payload hợp lệ.
+        """
+        client = APIClient()
+        response = client.post(
+            f'/api/posts/{self.post.id}/comments/',
+            data={'body': 'No auth comment'},
+            format='json',
+        )
+
+        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(Comment.objects.count(), 0)
+        self._log('Comment auth guard', f"status={response.status_code}")
+
+    def test_api_login_and_comment_flow(self):
+        """Kiểm tra luồng login API rồi tạo comment qua DRF.
+
+        Ghi chú: Test này xác nhận layer API mới hoạt động và trả JSON đúng
+        cho Postman/client bên ngoài.
+        """
+        client = APIClient()
+        login_response = client.post(
+            '/api/auth/login/',
+            data={'username': 'alice', 'password': 'password123'},
+            format='json',
+        )
+
+        self.assertEqual(login_response.status_code, 200)
+        self.assertTrue(login_response.data['ok'])
+
+        comment_response = client.post(
+            f'/api/posts/{self.post.id}/comments/',
+            data={'body': 'DRF comment works'},
+            format='json',
+        )
+
+        self.assertEqual(comment_response.status_code, 201)
+        self.assertEqual(Comment.objects.count(), 1)
+
     def test_follow_user(self):
         """Kiểm tra quan hệ follow và các hàm hỗ trợ hoạt động đúng.
 
@@ -133,9 +177,10 @@ class SocialMediaBasicTests(TestCase):
         """
         msg = MessageService.create_message(self.user2, 'alice', 'Hello Alice, how are you?')
         messages = MessageService.get_messages_between(self.user1, self.user2)
+        created_messages = Message.objects.filter(sender=self.user2, recipient=self.user1)
 
         self.assertIsNotNone(msg)
-        self.assertEqual(Message.objects.count(), 1)
+        self.assertEqual(created_messages.count(), 1)
         self.assertEqual(msg.sender.username, 'bob')
         self.assertEqual(msg.recipient.username, 'alice')
         self.assertEqual(msg.content, 'Hello Alice, how are you?')
