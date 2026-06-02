@@ -6,26 +6,136 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Chat with {{ other_user.username }}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            background: #ffffff;
+            color: #1f2937;
+        }
+
+        .chat-page {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px 16px 32px;
+        }
+
+        .chat-header {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0 0 16px;
+        }
+
+        .chat-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+        }
+
+        .chat-messages {
+            padding: 16px;
+            height: 420px;
+            overflow: auto;
+        }
+
+        .chat-message {
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #f9fafb;
+            border: 1px solid #eef2f7;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .chat-message strong {
+            color: #111827;
+        }
+
+        .chat-message small {
+            color: #6b7280;
+            margin-left: 6px;
+        }
+
+        .chat-empty {
+            color: #9ca3af;
+            text-align: center;
+            padding: 24px 0;
+        }
+
+        .chat-form {
+            display: flex;
+            gap: 12px;
+            padding: 12px 16px 16px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .chat-input {
+            flex: 1;
+            resize: none;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            background: #ffffff;
+        }
+
+        .chat-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .chat-send {
+            border: none;
+            border-radius: 10px;
+            background: #111827;
+            color: #ffffff;
+            padding: 0 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .chat-send:hover {
+            background: #0f172a;
+        }
+
+        @media (max-width: 640px) {
+            .chat-messages {
+                height: 360px;
+            }
+
+            .chat-form {
+                flex-direction: column;
+            }
+
+            .chat-send {
+                height: 44px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h2>Chat with {{ other_user.username }}</h2>
+    <div class="chat-page">
+        <h2 class="chat-header">Chat with {{ other_user.username }}</h2>
 
-    <div id="messages" style="border:1px solid #ddd; padding:10px; height:400px; overflow:auto;">
-        {% for m in messages %}
-            <div class="message" data-id="{{ m.id }}">
-                <strong>{{ m.sender.username }}:</strong> {{ m.content }} <small>({{ m.timestamp }})</small>
+        <div class="chat-card">
+            <div id="messages" class="chat-messages">
+                {% for m in messages %}
+                    <div class="chat-message" data-id="{{ m.id }}">
+                        <strong>{{ m.sender.username }}:</strong> {{ m.content }} <small>({{ m.timestamp }})</small>
+                    </div>
+                {% empty %}
+                    <div class="chat-empty">No messages yet.</div>
+                {% endfor %}
             </div>
-        {% empty %}
-            <div>No messages yet.</div>
-        {% endfor %}
-    </div>
 
-    <form id="chat-form" style="margin-top:10px;">
-        {% csrf_token %}
-        <input type="hidden" id="recipient" name="recipient" value="{{ other_user.username }}">
-        <textarea id="message-input" name="message" rows="2" style="width:80%;"></textarea>
-        <button id="send-btn" type="submit">Send</button>
-    </form>
+            <form id="chat-form" class="chat-form">
+                {% csrf_token %}
+                <input type="hidden" id="recipient" name="recipient" value="{{ other_user.username }}">
+                <textarea id="message-input" name="message" rows="2" class="chat-input" placeholder="Type a message..."></textarea>
+                <button id="send-btn" type="submit" class="chat-send">Send</button>
+            </form>
+        </div>
+    </div>
 
     <script>
         function getCookie(name) {
@@ -52,7 +162,7 @@
         chatSocket.onmessage = function(e) {
             const data = JSON.parse(e.data);
             const div = document.createElement('div');
-            div.className = 'message';
+            div.className = 'chat-message';
             div.dataset.id = data.id;
             div.innerHTML = `<strong>${data.sender}:</strong> ${data.content} <small>(${new Date(data.timestamp).toLocaleString()})</small>`;
             messagesEl.appendChild(div);
