@@ -1,449 +1,254 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth.models import User, auth
-from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.http import url_has_allowed_host_and_scheme
-from .models import FollowersCount, Post, Profile, LikePost, Comment
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.db.models import Count, Q
+from rest_framework import status
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import Comment, FollowersCount, LikePost, Message, Post, Profile
+from .serializers import CommentSerializer, MessageSerializer, PostSerializer, ProfileSerializer, UserSerializer
 from .services.message_service import MessageService
-from .services.user_service import UserService
-from itertools import chain
-from django.db.models import Count
-from django.db.models import Q
-from django.utils import timezone
-import random
+from .services.post_service import PostService
 
 
-def _attach_comments_to_posts(posts):
-    """Gắn danh sách bình luận đã sắp xếp vào từng đối tượng post.
-
-    Ghi chú: Cách này tránh phải query bình luận lặp lại trong template bằng
-    việc tạo sẵn thuộc tính `comments_list` cho mỗi post.
-    """
-    posts = list(posts)
-    post_ids = [post.id for post in posts]
-
-    if not post_ids:
-        return posts
-
-    comments_queryset = Comment.objects.filter(post_id__in=post_ids).order_by('-created_at')
-    comments_by_post = {}
-
-    for item in comments_queryset:
-        comments_by_post.setdefault(item.post_id, []).append(item)
-
-    for post in posts:
-        post.comments_list = comments_by_post.get(post.id, [])
-
-    return posts
+def _get_or_create_profile(user):
+    profile, _ = Profile.objects.get_or_create(user=user, defaults={'id_user': user.id})
+    return profile
 
 
-def health(request):
-    return JsonResponse({'ok': True})
-
-# Create your views here.
-@login_required(login_url='signin')
-def index(request):
-    """Render feed trang chủ cho người dùng đã đăng nhập.
-
-    Ghi chú: Feed được ghép từ những người đang theo dõi và bổ sung gợi ý
-    profile để template không phải tự xử lý logic.
-    """
-    user_object = User.objects.get(username=request.user.username)
-    user_profile = Profile.objects.filter(user=user_object).first()
-
-    user_following_list = []
-    feed = []
-
-    user_following = FollowersCount.objects.filter(follower=request.user)
-
-    for user in user_following:
-        user_following_list.append(user.user)
-    
-    for username in user_following_list:
-        feed_lists = Post.objects.filter(user=username)
-        feed.append(feed_lists)
-
-    feed_list = list(chain(*feed))
-
-    following_usernames = set(
-        FollowersCount.objects.filter(follower=request.user)
-        .values_list('user__username', flat=True)
-    )
-
-    suggested_users = User.objects.exclude(username=request.user.username).exclude(
-        username__in=following_usernames
-    )
-
-    suggestions_username_profile_list = list(
-        Profile.objects.filter(user__in=suggested_users).select_related('user')
-    )
-    random.shuffle(suggestions_username_profile_list)
-
-    suggestion_usernames = [profile.user.username for profile in suggestions_username_profile_list]
-    suggestion_followers = {
-        row['user__username']: row['total']
-        for row in FollowersCount.objects.filter(user__username__in=suggestion_usernames)
-        .values('user__username')
-        .annotate(total=Count('id'))
-    }
-
-    for profile in suggestions_username_profile_list:
-        profile.followers_count = suggestion_followers.get(profile.user.username, 0)
-
-    feed_list = _attach_comments_to_posts(feed_list)
-
-    return render(request, 'index.html', {'user_profile': user_profile, 'posts': feed_list, 'suggestions_username_profile_list': suggestions_username_profile_list[:4]})
-
-@login_required(login_url='signin')
-@csrf_exempt
-def setting(request):
-    """Hiển thị và cập nhật trang cài đặt của người dùng đăng nhập.
-
-    Ghi chú: Luồng đổi ảnh đại diện được xử lý ngay tại đây vì form nhỏ và dễ
-    giữ rõ ràng hơn.
-    """
-    user_profile, _ = Profile.objects.get_or_create(
-        user=request.user,
-        defaults={'id_user': request.user.id}
-    )
-
-    if request.method == 'POST':
-        if request.FILES.get('profileimg') == None:
-            profileimg = user_profile.profileimg
-            location = request.POST['location']
-            bio = request.POST['bio']
-
-            user_profile.profileimg = profileimg
-            user_profile.location = location
-            user_profile.bio = bio
-            user_profile.save()
-
-        if request.FILES.get('profileimg') != None:
-            profileimg = request.FILES.get('profileimg')
-            location = request.POST['location']
-            bio = request.POST['bio']
-
-            user_profile.profileimg = profileimg
-            user_profile.location = location
-            user_profile.bio = bio
-            user_profile.save()
-        
-        return redirect('setting')
-
-    return render(request, 'setting.html', {'user_profile': user_profile})
-
-@login_required(login_url='signin')
-def like_post(request):
-    """Bật hoặc tắt like của người dùng hiện tại trên một bài viết.
-
-    Ghi chú: Bộ đếm like được cập nhật cùng lúc với bản ghi quan hệ để UI
-    không bị lệch sau khi tải lại.
-    """
-    post_id = request.GET.get('post_id')
-    post = Post.objects.get(id=post_id)
-    like_filter = LikePost.objects.filter(post=post, user=request.user).first()
-
-    if like_filter == None:
-        new_like = LikePost.objects.create(post=post, user=request.user)
-        new_like.save()
-        post.no_of_likes = post.no_of_likes + 1
-        post.save()
-        return redirect('/')
-    else:
-        like_filter.delete()
-        post.no_of_likes = post.no_of_likes - 1
-        post.save()
-        return redirect('/')
+def _api_auth_classes():
+    return [BasicAuthentication, SessionAuthentication]
 
 
-def comment_post(request):
-    """Tạo bình luận rồi chuyển hướng về trang gốc.
+class BaseAPIView(APIView):
+    authentication_classes = _api_auth_classes()
 
-    Ghi chú: URL `next` được kiểm tra an toàn để tránh redirect sang host
-    không tin cậy.
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({'ok': False, 'error': 'Authentication required'}, status=401)
 
-    if request.method == 'POST':
-        post_id = request.POST.get('post_id')
-        comment_body = request.POST.get('comment', '').strip()
-        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or '/'
+class PublicAPIView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
-        if post_id and comment_body:
-            post = Post.objects.filter(id=post_id).first()
-            if post:
-                Comment.objects.create(
-                    post=post,
-                    user=request.user,
-                    body=comment_body,
-                )
 
-        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-            next_url = '/'
+class HealthAPIView(PublicAPIView):
+    def get(self, request):
+        return Response({'ok': True})
 
-        return redirect(next_url)
 
-    return redirect('/')
+class RegisterAPIView(PublicAPIView):
+    def post(self, request):
+        username = (request.data.get('username') or '').strip()
+        email = (request.data.get('email') or '').strip()
+        password = request.data.get('password') or ''
+        password2 = request.data.get('password2') or ''
 
-@login_required(login_url='signin')
-def profile(request, username):
-    """Hiển thị trang profile công khai cho username được truyền vào.
+        if not username or not email or not password:
+            return Response({'ok': False, 'error': 'Missing username, email, or password'}, status=status.HTTP_400_BAD_REQUEST)
 
-    Ghi chú: Trang này nạp sẵn bài viết và số follow để template không phải
-    làm thêm truy vấn cơ sở dữ liệu.
-    """
-    user_object = User.objects.get(username=username)
-    user_profile = Profile.objects.filter(user=user_object).first()
-    user_posts = _attach_comments_to_posts(Post.objects.filter(user=user_object))
-    user_post_length = len(user_posts)
+        if password != password2:
+            return Response({'ok': False, 'error': 'Password not matching'}, status=status.HTTP_400_BAD_REQUEST)
 
-    follower = request.user
-    user = user_object
+        if User.objects.filter(email=email).exists():
+            return Response({'ok': False, 'error': 'Email already used'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if FollowersCount.objects.filter(follower=follower, user=user).first():
-        button_text = 'Unfollow'
-    else:
-        button_text = 'Follow'
+        if User.objects.filter(username=username).exists():
+            return Response({'ok': False, 'error': 'Username already used'}, status=status.HTTP_400_BAD_REQUEST)
 
-    user_followers = len(FollowersCount.objects.filter(user=user_object))
-    user_following = len(FollowersCount.objects.filter(follower=user_object))
+        user = User.objects.create_user(username=username, email=email, password=password)
+        profile = _get_or_create_profile(user)
+        login(request, user)
 
-    context = {
-        'user_object': user_object,
-        'user_profile': user_profile,
-        'user_posts': user_posts,
-        'user_post_length': user_post_length,
-        'button_text': button_text,
-        'user_followers': user_followers,
-        'user_following': user_following,
-    }
+        return Response(
+            {'ok': True, 'user': UserSerializer(user).data, 'profile': ProfileSerializer(profile).data},
+            status=status.HTTP_201_CREATED,
+        )
 
-    return render(request, 'profile.html', context)
 
-@login_required(login_url='signin')
-@csrf_exempt
-def upload(request):
-    """Tạo bài viết mới từ ảnh upload và phần caption.
+class LoginAPIView(PublicAPIView):
+    def post(self, request):
+        username = (request.data.get('username') or '').strip()
+        password = request.data.get('password') or ''
 
-    Ghi chú: View này dùng đúng tên field của form upload hiện tại và sẽ trả
-    về sớm nếu request không phải POST.
-    """
-    if request.method == 'POST':
-        image = request.FILES.get('image_upload')
-        caption = request.POST['caption']
+        user = authenticate(username=username, password=password)
+        if user is None:
+            return Response({'ok': False, 'error': 'Credentials Invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
-        new_post = Post.objects.create(user=request.user, image=image, caption=caption)
-        new_post.save()
-        return redirect('/')
-    else:
-        return redirect('/')
-    return HttpResponse('Upload')
+        login(request, user)
+        profile = _get_or_create_profile(user)
+        return Response({'ok': True, 'user': UserSerializer(user).data, 'profile': ProfileSerializer(profile).data})
 
-@csrf_exempt
-def signup(request):
-    """Xử lý đăng ký tài khoản và tạo profile ban đầu.
 
-    Ghi chú: Gom bước tạo account và khởi tạo profile vào cùng một chỗ để
-    app luôn có `Profile` tương ứng sau khi đăng ký.
-    """
-    if request.method == 'POST':
+class LogoutAPIView(BaseAPIView):
+    def post(self, request):
+        logout(request)
+        return Response({'ok': True})
 
-        username = request.POST['username']
-        email = request.POST['email']
-        password = request.POST['password']
-        password2 = request.POST['password2']
 
-        if password == password2:
-            if User.objects.filter(email=email).exists():
-                messages.info(request, 'Email already used')
-                return redirect('signup')
-            elif User.objects.filter(username=username).exists():
-                messages.info(request, 'Username already used')
-                return redirect('signup')
-            else:
-                user = User.objects.create_user(username=username, email=email, password=password)
-                user.save()
+class MeAPIView(BaseAPIView):
+    def get(self, request):
+        profile = _get_or_create_profile(request.user)
+        return Response({'ok': True, 'user': UserSerializer(request.user).data, 'profile': ProfileSerializer(profile).data})
 
-                user_login = auth.authenticate(username=username, password=password)
-                auth.login(request, user_login)
-                
-                user_model = User.objects.get(username=username)
-                new_profile = Profile.objects.create(user=user_model, id_user=user_model.id)
-                new_profile.save()
 
-                return redirect('setting')
-        else: 
-            messages.info(request, 'Password not matching')
-            return redirect('signup')
+class PostCollectionAPIView(BaseAPIView):
+    def get(self, request):
+        scope = (request.query_params.get('scope') or 'feed').strip().lower()
 
-    else : return render(request, 'signup.html')
-
-@csrf_exempt
-def signin(request):
-    """Xác thực người dùng và khởi tạo session.
-
-    Ghi chú: Thông tin đăng nhập sai được coi là luồng bình thường và quay
-    lại màn hình đăng nhập kèm thông báo.
-    """
-    if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
-
-        user = auth.authenticate(username=username, password=password)
-
-        if user is not None:
-            auth.login(request, user)
-            return redirect('/')
+        if scope == 'all':
+            posts = Post.objects.select_related('user').prefetch_related('comments__user').order_by('-created_at')
         else:
-            messages.info(request, 'Credentials Invalid')
-            return redirect('signin')
+            following_ids = FollowersCount.objects.filter(follower=request.user).values_list('user_id', flat=True)
+            posts = Post.objects.filter(Q(user=request.user) | Q(user_id__in=following_ids)).select_related('user').prefetch_related('comments__user').distinct().order_by('-created_at')
 
-    else :
-        return render(request, 'signin.html')
-    
-@login_required(login_url='signin')
-def logout(request):
-    """Đăng xuất người dùng hiện tại và chuyển về trang đăng nhập.
+        return Response({'ok': True, 'posts': PostSerializer(posts, many=True, context={'request': request}).data})
 
-    Ghi chú: View này rất nhỏ vì Django auth backend đã xử lý phần kết thúc
-    session.
-    """
-    auth.logout(request)
-    return redirect('signin')
+    def post(self, request):
+        image = request.FILES.get('image_upload') or request.FILES.get('image')
+        caption = (request.data.get('caption') or '').strip()
 
-@login_required(login_url='signin')
-@csrf_exempt
-def follow(request):
-    """Tạo hoặc xoá quan hệ follow giữa hai người dùng.
+        if image is None or not caption:
+            return Response({'ok': False, 'error': 'Missing image or caption'}, status=status.HTTP_400_BAD_REQUEST)
 
-    Ghi chú: Dữ liệu POST dùng username nên view phải đổi sang user object
-    trước khi thao tác với các dòng foreign key.
-    """
-    if request.method == 'POST':
-        follower_username = request.POST['follower']
-        user_username = request.POST['user']
-        follower = User.objects.filter(username=follower_username).first()
-        user = User.objects.filter(username=user_username).first()
-
-        if follower is None or user is None:
-            return redirect('/')
-
-        if FollowersCount.objects.filter(follower=follower, user=user).first():
-            delete_follower = FollowersCount.objects.get(follower=follower, user=user)
-            delete_follower.delete()
-            return redirect('/profile/' + user.username)
-        else:
-            new_follower = FollowersCount.objects.create(follower=follower, user=user)
-            new_follower.save()
-            return redirect('/profile/' + user.username)
-    else:
-        return redirect('/')
+        post = Post.objects.create(user=request.user, image=image, caption=caption)
+        return Response({'ok': True, 'post': PostSerializer(post, context={'request': request}).data}, status=status.HTTP_201_CREATED)
 
 
-@login_required(login_url='signin')
-def search(request):
-    """Tìm profile theo username và gắn thêm số lượng follower.
+class PostDetailAPIView(BaseAPIView):
+    def get(self, request, post_id):
+        post = Post.objects.select_related('user').prefetch_related('comments__user').filter(id=post_id).first()
+        if post is None:
+            return Response({'ok': False, 'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    Ghi chú: Danh sách kết quả được dựng bằng Python để phần render template
-    đơn giản và có kết quả ổn định.
-    """
-    query = ''
+        return Response({'ok': True, 'post': PostSerializer(post, context={'request': request}).data})
 
-    if request.method == 'POST':
-        query = request.POST.get('username', '').strip()
-    else:
-        query = request.GET.get('q', '').strip()
 
-    matched_profiles = []
+class PostLikeToggleAPIView(BaseAPIView):
+    def post(self, request, post_id):
+        post = Post.objects.filter(id=post_id).first()
+        if post is None:
+            return Response({'ok': False, 'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if query:
-        matched_users = User.objects.filter(username__icontains=query).order_by('username')
-        profiles = Profile.objects.filter(user__in=matched_users).select_related('user')
+        liked = PostService.toggle_like(post, request.user)
+        return Response({'ok': True, 'liked': liked, 'no_of_likes': post.no_of_likes})
 
-        matched_usernames = [profile.user.username for profile in profiles]
+
+class CommentListCreateAPIView(BaseAPIView):
+    def get(self, request, post_id):
+        post = Post.objects.filter(id=post_id).first()
+        if post is None:
+            return Response({'ok': False, 'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        comments = Comment.objects.filter(post=post).select_related('user').order_by('-created_at')
+        return Response({'ok': True, 'comments': CommentSerializer(comments, many=True).data})
+
+    def post(self, request, post_id):
+        post = Post.objects.filter(id=post_id).first()
+        if post is None:
+            return Response({'ok': False, 'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        body = (request.data.get('body') or request.data.get('comment') or '').strip()
+        if not body:
+            return Response({'ok': False, 'error': 'Missing comment body'}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment = Comment.objects.create(post=post, user=request.user, body=body)
+        return Response({'ok': True, 'comment': CommentSerializer(comment).data}, status=status.HTTP_201_CREATED)
+
+
+class ProfileDetailAPIView(BaseAPIView):
+    def get(self, request, username):
+        user = User.objects.filter(username=username).first()
+        if user is None:
+            return Response({'ok': False, 'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        profile = Profile.objects.filter(user=user).first()
+        if profile is None:
+            profile = _get_or_create_profile(user)
+
+        profile.followers_count = FollowersCount.objects.filter(user=user).count()
+        profile.following_count = FollowersCount.objects.filter(follower=user).count()
+
+        posts = Post.objects.filter(user=user).select_related('user').prefetch_related('comments__user').order_by('-created_at')
+        return Response(
+            {
+                'ok': True,
+                'profile': ProfileSerializer(profile).data,
+                'posts': PostSerializer(posts, many=True, context={'request': request}).data,
+                'post_count': posts.count(),
+            }
+        )
+
+
+class SearchProfilesAPIView(BaseAPIView):
+    def get(self, request):
+        query = (request.query_params.get('q') or request.query_params.get('username') or '').strip()
+        if not query:
+            return Response({'ok': True, 'results': []})
+
+        profiles = Profile.objects.filter(user__username__icontains=query).select_related('user').order_by('user__username')
+        usernames = [profile.user.username for profile in profiles]
         follower_counts = {
             row['user__username']: row['total']
-            for row in FollowersCount.objects.filter(user__username__in=matched_usernames)
-            .values('user__username')
-            .annotate(total=Count('id'))
+            for row in FollowersCount.objects.filter(user__username__in=usernames).values('user__username').annotate(total=Count('id'))
         }
 
-        matched_profiles = [
+        results = []
+        for profile in profiles:
+            profile.followers_count = follower_counts.get(profile.user.username, 0)
+            profile.following_count = FollowersCount.objects.filter(follower=profile.user).count()
+            results.append(ProfileSerializer(profile).data)
+
+        return Response({'ok': True, 'query': query, 'results': results})
+
+
+class FollowToggleAPIView(BaseAPIView):
+    def post(self, request):
+        target_username = (request.data.get('username') or request.data.get('user') or request.data.get('target_username') or '').strip()
+        if not target_username:
+            return Response({'ok': False, 'error': 'Missing username'}, status=status.HTTP_400_BAD_REQUEST)
+
+        target_user = User.objects.filter(username=target_username).first()
+        if target_user is None:
+            return Response({'ok': False, 'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        relation = FollowersCount.objects.filter(follower=request.user, user=target_user).first()
+        if relation is None:
+            FollowersCount.objects.create(follower=request.user, user=target_user)
+            following = True
+        else:
+            relation.delete()
+            following = False
+
+        return Response(
             {
-                'profile': profile,
-                'followers': follower_counts.get(profile.user.username, 0),
+                'ok': True,
+                'following': following,
+                'followers_count': FollowersCount.objects.filter(user=target_user).count(),
+                'following_count': FollowersCount.objects.filter(follower=target_user).count(),
             }
-            for profile in profiles
-        ]
-
-    current_user_profile = Profile.objects.filter(user=request.user).first()
-
-    context = {
-        'query': query,
-        'matched_profiles': matched_profiles,
-        'user_profile': current_user_profile,
-    }
-
-    return render(request, 'search.html', context)
+        )
 
 
-@login_required(login_url='signin')
-def chat(request, username):
-    """Hiển thị lịch sử chat giữa người dùng hiện tại và một người khác.
+class MessageThreadAPIView(BaseAPIView):
+    def get(self, request, username):
+        other_user = User.objects.filter(username=username).first()
+        if other_user is None:
+            return Response({'ok': False, 'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    Ghi chú: User không tồn tại sẽ được chuyển hướng sớm để template chỉ nhận
-    được một đối tượng chat hợp lệ.
-    """
-    other_user = UserService.get_user_by_username(username)
-    if other_user is None:
-        return redirect('/')
-
-    # initial messages between the two users
-    messages_qs = []
-    messages_qs = MessageService.get_messages_between(request.user, other_user)
-
-    return render(request, 'chat.html', {'other_user': other_user, 'messages': messages_qs})
+        messages_qs = MessageService.get_messages_between(request.user, other_user)
+        return Response({'ok': True, 'messages': MessageSerializer(messages_qs, many=True).data})
 
 
-@login_required(login_url='signin')
-@csrf_exempt
-def send_message(request):
-    """Nhận tin nhắn chat và trả về phản hồi JSON.
-
-    Ghi chú: Endpoint này chỉ trả JSON để front-end gọi được mà không cần tải
-    lại toàn bộ trang.
-    """
-    if request.method == 'POST':
-        recipient_username = request.POST.get('recipient')
-        content = request.POST.get('message', '').strip()
+class MessageCollectionAPIView(BaseAPIView):
+    def post(self, request):
+        recipient_username = (request.data.get('recipient') or '').strip()
+        content = (request.data.get('message') or request.data.get('content') or '').strip()
 
         if not recipient_username or not content:
-            return JsonResponse({'ok': False, 'error': 'Missing recipient or content'})
+            return Response({'ok': False, 'error': 'Missing recipient or content'}, status=status.HTTP_400_BAD_REQUEST)
 
         msg = MessageService.create_message(request.user, recipient_username, content)
         if msg is None:
-            return JsonResponse({'ok': False, 'error': 'Recipient not found'})
+            return Response({'ok': False, 'error': 'Recipient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        return JsonResponse({'ok': True, 'message': MessageService.serialize_message(msg)})
-
-    return JsonResponse({'ok': False, 'error': 'Invalid method'})
-
-
-@login_required(login_url='signin')
-def fetch_messages(request, username):
-    """Trả về lịch sử hội thoại với một người dùng dưới dạng JSON.
-
-    Ghi chú: Payload được serialize qua `MessageService` để phản hồi đồng
-    nhất với `send_message`.
-    """
-    other_user = UserService.get_user_by_username(username)
-    if not other_user:
-        return JsonResponse({'ok': False, 'error': 'User not found'})
-
-    messages_qs = MessageService.get_messages_between(request.user, other_user)
-    messages_list = [MessageService.serialize_message(m) for m in messages_qs]
-
-    return JsonResponse({'ok': True, 'messages': messages_list})
+        return Response({'ok': True, 'message': MessageSerializer(msg).data}, status=status.HTTP_201_CREATED)
